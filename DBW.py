@@ -90,12 +90,12 @@ def generuj_lata(przekroj_lst, przekroj_id):
         if przekroj_dct['id-przekroj'] == przekroj_id:
             return przekroj_dct['szereg-czasowy']
 
-def generuj_meta_dct(zmienne_list, meta_URL):
+def generuj_meta_dct(sorted_list, meta_URL):
     zmienne_meta_dict = {}
-    for zmienna in zmienne_list:
-        response = requests.get(meta_URL, params = {'id-zmiennej' : zmienna[0]})
+    for obszar in sorted_list:
+        response = requests.get(meta_URL, params = {'id-zmiennej' : obszar[0]})
         if response.status_code == 200:
-            zmienne_meta_dict[zmienna[0]] = response.json()
+            zmienne_meta_dict[obszar[0]] = response.json()
     return zmienne_meta_dict
 
 def generuj_czestotliwosc_dct(zmienne_meta_dict):
@@ -105,28 +105,51 @@ def generuj_czestotliwosc_dct(zmienne_meta_dict):
             czestotliwosc = przekroj['nazwa-czestotliwosc']
             id_zmienna = value['id-zmienna']
             nazwa_zmienna = value['nazwa-skrocona']
-            id_przekroj = przekroj['id-przekroj']
-            nazwa_przekroj = przekroj['nazwa-przekroj']
             if czestotliwosc in czesto:
-                czesto[czestotliwosc].append((id_zmienna, nazwa_zmienna, id_przekroj, nazwa_przekroj))
+                czesto[czestotliwosc].add((nazwa_zmienna, id_zmienna))
             else:
-                czesto[czestotliwosc] = [(id_zmienna, nazwa_zmienna, id_przekroj, nazwa_przekroj)]
+                czesto[czestotliwosc] = {(nazwa_zmienna, id_zmienna)}
     return czesto
 
-df = pd.DataFrame(
-    pd_sample, columns=['id-zmienna', 'zmienna', 'id-przekroj', 'przekroj'])
 
 if __name__ == '__main__':
+
+    przekroj_okres_URL = "https://api-dbw.stat.gov.pl/api/1.1.0/variable/variable-section-periods"
+    meta_URL = 'https://api-dbw.stat.gov.pl/api/1.1.0/variable/variable-meta'
+    okresy_def_URL = 'https://api-dbw.stat.gov.pl/api/1.1.0/dictionaries/periods-dictionary?page=1&page-size=100'
 
     #Pobieranie listy obszarów
 
     hierarchia_URL = "https://api-dbw.stat.gov.pl/api/1.1.0/area/area-area"
     hierarchia = get(hierarchia_URL)
+
+    #Wybieranie sposobu wyboru danych
+    obszary_dct = generuj_obszary(hierarchia)
+    obszary = sortuj_dict(obszary_dct)
+
+    #Wybieranie po częstotliwości
+    zmienne_meta_dict = generuj_meta_dct(obszary, meta_URL)
+    czestotliwosci = generuj_czestotliwosc_dct(zmienne_meta_dict)
+    print(f"Dostępne częstotliwości próbkowania to: {czestotliwosci.keys()}")
+    czestotliwosc = (input("\nKocie wybierz częstotliwość :) "))
+    dane_czesto = czestotliwosci[czestotliwosc]
+    # df = pd.DataFrame(dane_czesto, columns=['id-zmienna', 'zmienna'])
+    print("Obszary dostępne dla danej częstotliwości to")
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_colwidth', None)
+    # with pd.option_context('display.max_rows', None,
+    #                    'display.max_columns', 1000,
+    #                    'display.precision', 1000,
+    #                    ):
+    #     print(df)
+    # print(df.to_string())
+    dane_czesto = sorted(list(dane_czesto))
+    print(*dane_czesto, sep='\n')
+    input("koniec")
     
     #Wyświetlanie listy obszarów
 
-    obszary_dct = generuj_obszary(hierarchia)
-    obszary = sortuj_dict(obszary_dct)
+
     print('DOSTĘPNE OBSZARY')
     print(*obszary, sep='\n')
     obszar = int(input("\nKocie wybierz id obszaru :) "))
@@ -146,9 +169,7 @@ if __name__ == '__main__':
     print("Generowanie listy przekrojów i okresów, to trochę zajmie ;) ")
 
     #wyświetlanie dostępnych przekrojów i okresów dla zmiennej
-    przekroj_okres_URL = "https://api-dbw.stat.gov.pl/api/1.1.0/variable/variable-section-periods"
-    meta_URL = 'https://api-dbw.stat.gov.pl/api/1.1.0/variable/variable-meta'
-    okresy_def_URL = 'https://api-dbw.stat.gov.pl/api/1.1.0/dictionaries/periods-dictionary?page=1&page-size=100'
+
     przekroje_okresy_list = generuj_przekroje_okresy_lst(zmienna)
     przekroje_okresy_dict = generuj_przekroje_okresy_dct(przekroje_okresy_list)[zmienna]
 
